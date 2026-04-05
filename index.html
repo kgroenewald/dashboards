@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>₿ Dashboard Hub</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--border:#1e293b;--card:#0f172a}
+body{background:#0a0f1a;color:#e2e8f0;font-family:'Barlow Condensed','Courier New',monospace;font-size:14px;min-height:100vh}
+
+/* ── TOOLBAR ── */
+#toolbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:10px;padding:8px 16px;background:rgba(10,15,26,.96);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);box-shadow:0 2px 12px #0006}
+.logo{color:#fb923c;font-size:18px;font-weight:700}
+.title{color:#cbd5e1;font-weight:600;font-size:13px}
+.spacer{flex:1}
+
+/* ── GRID ── */
+.hub{max-width:900px;margin:48px auto;padding:0 20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px}
+
+/* ── TILES ── */
+.tile{display:block;text-decoration:none;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:28px 24px;transition:border-color .2s,box-shadow .2s,transform .15s}
+.tile:hover{border-color:#fb923c;box-shadow:0 0 20px rgba(251,146,60,.15);transform:translateY(-2px)}
+.tile-icon{font-size:28px;margin-bottom:12px}
+.tile-title{color:#e2e8f0;font-size:18px;font-weight:700;letter-spacing:.5px;margin-bottom:6px}
+.tile-desc{color:#94a3b8;font-size:12px;line-height:1.6;font-family:'Courier New',monospace}
+.tile-arrow{display:inline-block;margin-top:16px;color:#fb923c;font-size:12px;font-weight:600;letter-spacing:1px}
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <span class="logo">₿</span>
+  <span class="title">Dashboard Hub</span>
+</div>
+
+<div class="hub">
+
+  <a class="tile" href="reversal-dashboard.html">
+    <div class="tile-icon">⟳</div>
+    <div class="tile-title">Reversal Dashboard</div>
+    <div class="tile-desc">Confluence signals for detecting trend reversals. RSI, OI, CVD, funding rate, and order book analysis.</div>
+    <div class="tile-arrow">OPEN →</div>
+  </a>
+
+  <a class="tile" href="day-trader-dashboard.html">
+    <div class="tile-icon">📈</div>
+    <div class="tile-title">Day Trader Dashboard</div>
+    <div class="tile-desc">Intraday signals with session windows, 15m trade setups, OI and CVD charts for active day trading.</div>
+    <div class="tile-arrow">OPEN →</div>
+  </a>
+
+  <a class="tile" href="unified-dashboard.html">
+    <div class="tile-icon">⚡</div>
+    <div class="tile-title">Unified Trading Dashboard</div>
+    <div class="tile-desc">Combined market view — sessions, RSI divergences, OI analysis, money flow, and daily outlook.</div>
+    <div class="tile-arrow">OPEN →</div>
+  </a>
+
+  <a class="tile" href="trading-calculator.html">
+    <div class="tile-icon">🧮</div>
+    <div class="tile-title">Position Calculator</div>
+    <div class="tile-desc">Risk, margin, and max size calculator. Input account size, leverage, and risk % to size your trades.</div>
+    <div class="tile-arrow">OPEN →</div>
+  </a>
+
+</div>
+
+</body>
+</html>

@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trading Position Calculator</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0c10;
+    --panel: #111318;
+    --border: #1e2230;
+    --orange: #ff6b1a;
+    --orange-dim: #cc5214;
+    --green: #00e676;
+    --green-dim: #00b85c;
+    --blue: #29b6f6;
+    --red: #ff1744;
+    --text: #e8eaf0;
+    --muted: #5a6080;
+    --label: #8899bb;
+    --mono: 'Share Tech Mono', monospace;
+    --sans: 'Barlow Condensed', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background-image:
+      radial-gradient(ellipse 60% 40% at 50% 0%, rgba(255,107,26,0.08) 0%, transparent 70%),
+      repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(255,255,255,0.02) 39px, rgba(255,255,255,0.02) 40px),
+      repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(255,255,255,0.02) 39px, rgba(255,255,255,0.02) 40px);
+  }
+
+  .wrapper {
+    width: 100%;
+    max-width: 560px;
+  }
+
+  .header {
+    text-align: center;
+    margin-bottom: 28px;
+  }
+
+  .header h1 {
+    font-family: var(--sans);
+    font-weight: 900;
+    font-size: 2rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text);
+  }
+
+  .header h1 span {
+    color: var(--orange);
+  }
+
+  .header p {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--muted);
+    letter-spacing: 0.2em;
+    margin-top: 4px;
+    text-transform: uppercase;
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    box-shadow: 0 0 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,107,26,0.05);
+  }
+
+  /* Section headers */
+  .section-label {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 20px 6px;
+    background: rgba(255,255,255,0.02);
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* Rows */
+  .row {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--border);
+    min-height: 46px;
+    gap: 12px;
+    transition: background 0.15s;
+  }
+
+  .row:last-child { border-bottom: none; }
+  .row:hover { background: rgba(255,255,255,0.015); }
+
+  .row-label {
+    font-family: var(--sans);
+    font-size: 0.9rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--label);
+    text-transform: uppercase;
+  }
+
+  /* Input styling */
+  .inp-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .inp-wrap .prefix {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--orange);
+    position: absolute;
+    left: 9px;
+    pointer-events: none;
+  }
+
+  .inp-wrap .suffix {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--orange);
+    position: absolute;
+    right: 9px;
+    pointer-events: none;
+  }
+
+  input[type="number"] {
+    background: rgba(255,107,26,0.1);
+    border: 1px solid rgba(255,107,26,0.35);
+    color: #ffffff;
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    padding: 6px 30px 6px 10px;
+    width: 110px;
+    border-radius: 2px;
+    text-align: right;
+    outline: none;
+    transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+    -moz-appearance: textfield;
+  }
+
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+  input[type="number"]:focus {
+    border-color: var(--orange);
+    background: rgba(255,107,26,0.18);
+    box-shadow: 0 0 0 2px rgba(255,107,26,0.15);
+  }
+
+  input.has-prefix { padding-left: 24px; }
+
+  /* Value display */
+  .val {
+    font-family: var(--mono);
+    font-size: 0.85rem;
+    text-align: right;
+    min-width: 80px;
+  }
+
+  .val.orange { color: var(--orange); }
+  .val.green  { color: var(--green); }
+  .val.blue   { color: var(--blue); }
+  .val.muted  { color: var(--muted); }
+
+  /* Result rows */
+  .result-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--border);
+    min-height: 50px;
+    gap: 12px;
+  }
+
+  .result-row:last-child { border-bottom: none; }
+
+  .result-label {
+    font-family: var(--sans);
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text);
+  }
+
+  .result-val {
+    font-family: var(--mono);
+    font-size: 1.1rem;
+    font-weight: bold;
+    text-align: right;
+  }
+
+  .result-val.green { color: var(--green); text-shadow: 0 0 12px rgba(0,230,118,0.4); }
+  .result-val.blue  { color: var(--blue);  text-shadow: 0 0 12px rgba(41,182,246,0.4); }
+  .result-val.red   { color: var(--red);   text-shadow: 0 0 12px rgba(255,23,68,0.4); }
+
+  /* RR special row */
+  .rr-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    padding: 0 20px;
+    border-bottom: 1px solid var(--border);
+    min-height: 46px;
+  }
+
+  .rr-val {
+    font-family: var(--mono);
+    font-size: 0.95rem;
+    color: var(--blue);
+    text-align: right;
+  }
+
+  /* Divider */
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--orange), transparent);
+    opacity: 0.3;
+  }
+
+  /* Reset button */
+  .footer {
+    margin-top: 16px;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .btn-reset {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: transparent;
+    border: 1px solid var(--border);
+    padding: 7px 18px;
+    border-radius: 2px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn-reset:hover {
+    color: var(--text);
+    border-color: var(--orange);
+    background: rgba(255,107,26,0.07);
+  }
+
+  /* Pulse animation on result change */
+  @keyframes pulse-green {
+    0%   { box-shadow: 0 0 0 0 rgba(0,230,118,0.4); }
+    70%  { box-shadow: 0 0 0 6px rgba(0,230,118,0); }
+    100% { box-shadow: 0 0 0 0 rgba(0,230,118,0); }
+  }
+
+  .results-section { position: relative; }
+
+  .results-section::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--green), transparent);
+    opacity: 0.5;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrapper">
+  <div class="header">
+    <h1>Position <span>Calculator</span></h1>
+    <p>Risk &nbsp;·&nbsp; Margin &nbsp;·&nbsp; Max Size</p>
+  </div>
+
+  <div class="card">
+
+    <!-- INPUTS -->
+    <div class="section-label">// Inputs</div>
+
+    <!-- Account Size -->
+    <div class="row">
+      <span class="row-label">Account Size</span>
+      <div class="inp-wrap">
+        <span class="prefix">$</span>
+        <input type="number" id="accountSize" class="has-prefix" value="146" min="0" step="0.01">
+      </div>
+      <div style="width:80px"></div>
+    </div>
+
+    <!-- Leverage -->
+    <div class="row">
+      <span class="row-label">Leverage</span>
+      <div class="inp-wrap">
+        <input type="number" id="leverage" value="10" min="1" step="1" style="width:110px; padding-right:10px; text-align:right;">
+      </div>
+      <div style="width:80px"></div>
+    </div>
+
+    <!-- Risk Amount -->
+    <div class="row">
+      <span class="row-label">Risk Amount</span>
+      <div class="inp-wrap">
+        <input type="number" id="riskPct" value="0.50" min="0" step="0.01" style="width:110px; padding-right:26px; text-align:right;">
+        <span class="suffix">%</span>
+      </div>
+      <span class="val orange" id="riskAmountDisplay">$ 0.73</span>
+    </div>
+
+    <!-- Stop Loss -->
+    <div class="row">
+      <span class="row-label">Stop Loss</span>
+      <div class="inp-wrap">
+        <input type="number" id="stopLossPct" value="1.00" min="0" step="0.01" style="width:110px; padding-right:26px; text-align:right;">
+        <span class="suffix">%</span>
+      </div>
+      <div style="width:80px"></div>
+    </div>
+
+    <!-- TP -->
+    <div class="row">
+      <span class="row-label">Take Profit</span>
+      <div class="inp-wrap">
+        <input type="number" id="tpPct" value="0" min="0" step="0.01" style="width:110px; padding-right:26px; text-align:right;">
+        <span class="suffix">%</span>
+      </div>
+      <span class="val green" id="tpAmountDisplay">$ 37.60</span>
+    </div>
+
+    <!-- RR -->
+    <div class="rr-row">
+      <span class="row-label" style="font-size:0.9rem; color:var(--label); text-transform:uppercase; letter-spacing:0.04em;">Risk / Reward</span>
+      <span class="rr-val" id="rrDisplay">51.50</span>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- RESULTS -->
+    <div class="section-label results-section">// Results</div>
+
+    <div class="result-row">
+      <span class="result-label">Margin (Cost)</span>
+      <span class="result-val green" id="marginDisplay">$ 18.25</span>
+    </div>
+
+    <div class="result-row">
+      <span class="result-label">Max Position Size</span>
+      <span class="result-val blue" id="maxPosDisplay">$ 182.50</span>
+    </div>
+
+  </div>
+
+  <div class="footer">
+    <button class="btn-reset" onclick="resetDefaults()">↺ &nbsp;Reset Defaults</button>
+  </div>
+</div>
+
+<script>
+  const ids = ['accountSize','leverage','riskPct','stopLossPct','tpPct'];
+  ids.forEach(id => document.getElementById(id).addEventListener('input', calculate));
+
+  function fmt(val) {
+    return '$ ' + val.toFixed(2);
+  }
+
+  function calculate() {
+    const accountSize = parseFloat(document.getElementById('accountSize').value) || 0;
+    const leverage    = parseFloat(document.getElementById('leverage').value)    || 1;
+    const riskPct     = parseFloat(document.getElementById('riskPct').value)     || 0;
+    const stopLossPct = parseFloat(document.getElementById('stopLossPct').value) || 0;
+    const tpPct       = parseFloat(document.getElementById('tpPct').value)       || 0;
+
+    // Risk Amount = Account Size x (Risk% / 100)
+    const riskAmount = accountSize * (riskPct / 100);
+
+    // Max Position Size = (Risk Amount / Stop Loss%) x 100
+    const maxPositionSize = stopLossPct > 0 ? (riskAmount / stopLossPct) * 100 : 0;
+
+    // Margin (Cost) = Max Position Size / Leverage
+    const margin = leverage > 0 ? maxPositionSize / leverage : 0;
+
+    // TP Amount = Margin x (TP% / 10)
+    const tpAmount = margin * (tpPct / 10);
+
+    // RR = TP% / Stop Loss%
+    const rr = stopLossPct > 0 ? tpPct / stopLossPct : 0;
+
+    // Update display
+    document.getElementById('riskAmountDisplay').textContent = fmt(riskAmount);
+    document.getElementById('tpAmountDisplay').textContent   = fmt(tpAmount);
+    document.getElementById('rrDisplay').textContent         = rr.toFixed(2);
+    document.getElementById('marginDisplay').textContent     = fmt(margin);
+    document.getElementById('maxPosDisplay').textContent     = fmt(maxPositionSize);
+  }
+
+  function resetDefaults() {
+    document.getElementById('accountSize').value = 146;
+    document.getElementById('leverage').value    = 10;
+    document.getElementById('riskPct').value     = 0.50;
+    document.getElementById('stopLossPct').value = 1.00;
+    document.getElementById('tpPct').value       = 0;
+    calculate();
+  }
+
+  // Init
+  calculate();
+</script>
+</body>
+</html>

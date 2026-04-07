@@ -980,10 +980,32 @@ function generateAlerts(klinesMap,oiMap,funding,allDivs){
 
   // Dedup by name+tf, sort priority asc then confidence desc
   const seen=new Set();
-  const now=new Date();
   const unique=alerts.filter(a=>{const k=a.name+a.tf;if(seen.has(k))return false;seen.add(k);return true;});
-  unique.forEach(a=>a.raisedAt=now);
-  return unique.sort((a,b)=>a.priority!==b.priority?a.priority-b.priority:b.confidence-a.confidence);
+
+  // Persist timestamps in localStorage so refresh doesn't reset them.
+  // Alerts older than 1 hour are dropped.
+  const STORE_KEY='alertTimestamps';
+  const ONE_HOUR=60*60*1000;
+  const now=Date.now();
+  let stored={};
+  try{stored=JSON.parse(localStorage.getItem(STORE_KEY)||'{}');}catch(_){}
+
+  // Prune stale entries
+  for(const k of Object.keys(stored)){if(now-stored[k]>=ONE_HOUR)delete stored[k];}
+
+  // Assign timestamps and filter out alerts that have aged off
+  const fresh=unique.filter(a=>{
+    const k=a.name+a.tf;
+    if(stored[k]==null)stored[k]=now;          // new alert — stamp it
+    const age=now-stored[k];
+    if(age>=ONE_HOUR)return false;             // too old — drop
+    a.raisedAt=new Date(stored[k]);
+    return true;
+  });
+
+  try{localStorage.setItem(STORE_KEY,JSON.stringify(stored));}catch(_){}
+
+  return fresh.sort((a,b)=>a.priority!==b.priority?a.priority-b.priority:b.confidence-a.confidence);
 }
 
 // ── CHART THEME ───────────────────────────────────────────────────────────────

@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BitFunded 2-Step Calculator</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: #111827;
+      color: #d1d5db;
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+
+    h1 {
+      color: #f9fafb;
+      font-size: 1.4rem;
+      font-weight: 600;
+      margin-bottom: 24px;
+      letter-spacing: 0.02em;
+    }
+
+    h2 {
+      color: #9ca3af;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 12px;
+    }
+
+    .wrapper {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* ── Position calculator row ── */
+    .pos-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: start;
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .card-header {
+      padding: 12px 18px;
+      border-bottom: 1px solid #374151;
+    }
+
+    /* ── Tables ── */
+    table { width: 100%; border-collapse: collapse; }
+
+    td {
+      padding: 8px 14px;
+      font-size: 0.875rem;
+      border-bottom: 1px solid #27303f;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    .label { color: #9ca3af; }
+    .value {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      color: #e5e7eb;
+      white-space: nowrap;
+    }
+
+    /* ── Inputs ── */
+    input[type="number"] {
+      background: #111827;
+      border: 1px solid #4b5563;
+      border-radius: 6px;
+      color: #f9fafb;
+      font-size: 0.875rem;
+      padding: 4px 8px;
+      text-align: right;
+      width: 100px;
+      transition: border-color 0.15s;
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="number"]:focus {
+      outline: none;
+      border-color: #6366f1;
+      box-shadow: 0 0 0 2px #6366f133;
+    }
+
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button { opacity: 0.4; }
+
+    /* ── Color tokens ── */
+    .blue   { color: #93c5fd; font-weight: 600; }
+    .red    { color: #f87171; font-weight: 600; }
+    .green  { color: #4ade80; font-weight: 600; }
+    .yellow { color: #fbbf24; font-weight: 600; }
+    .white  { color: #f9fafb; font-weight: 700; }
+    .muted  { color: #6b7280; }
+
+    /* ── Stage grid ── */
+    .stage-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+
+    .stage-card {
+      background: #1f2937;
+      border: 1px solid #374151;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .stage-header {
+      padding: 10px 14px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 0.82rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .stage-header.s1     { background: #1d4ed811; color: #93c5fd; border-bottom: 2px solid #2563eb; }
+    .stage-header.s2     { background: #1d4ed811; color: #a5b4fc; border-bottom: 2px solid #4f46e5; }
+    .stage-header.trader { background: #1e3a5f;   color: #93c5fd; border-bottom: 2px solid #1d4ed8; }
+
+    .stage-card td { font-size: 0.8rem; padding: 7px 11px; border-bottom: 1px solid #27303f; }
+    .stage-card tr:last-child td { border-bottom: none; }
+    .stage-card .label { color: #9ca3af; }
+
+    .divider td {
+      background: #111827;
+      color: #6b7280;
+      font-size: 0.68rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 5px 11px;
+    }
+
+    .hl { background: #1a2535; }
+
+    /* ── Responsive ── */
+    @media (max-width: 760px) {
+      .pos-row { grid-template-columns: 1fr; }
+      .stage-grid { grid-template-columns: 1fr; }
+      input[type="number"] { width: 88px; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrapper">
+  <a href="index.html" style="display:inline-flex;align-items:center;gap:6px;color:#fb923c;font-size:13px;font-weight:600;text-decoration:none;letter-spacing:.5px;margin-bottom:8px;">← HOME</a>
+  <h1>BitFunded 2-Step Calculator</h1>
+
+  <!-- ══ Position Calculator + Trade Size ══ -->
+  <div class="pos-row">
+
+    <!-- Position Calculator -->
+    <div class="card">
+      <div class="card-header"><h2>Position Calculator</h2></div>
+      <table>
+        <tr>
+          <td class="label">Account Size</td>
+          <td class="value" colspan="2">$ <input type="number" id="accountSize" value="10000" min="0" step="100" /></td>
+        </tr>
+        <tr>
+          <td class="label">Leverage</td>
+          <td class="value blue" colspan="2"><input type="number" id="leverage" value="5" min="1" max="500" step="1" /></td>
+        </tr>
+        <tr>
+          <td class="label">Risk Amount</td>
+          <td class="value red"><input type="number" id="riskPct" value="0.50" min="0" max="100" step="0.01" /> %</td>
+          <td class="value white">$ <span id="riskAmt">50.00</span></td>
+        </tr>
+        <tr>
+          <td class="label">Stop Loss</td>
+          <td class="value red"><input type="number" id="slPct" value="2.40" min="0.01" max="100" step="0.01" /> %</td>
+          <td class="value"></td>
+        </tr>
+        <tr>
+          <td class="label">Take Profit (TP)</td>
+          <td class="value green"><input type="number" id="tpPct" value="11.00" min="0.01" max="100" step="0.01" /> %</td>
+          <td class="value green">$ <span id="tpAmt">229.17</span></td>
+        </tr>
+        <tr class="hl">
+          <td class="label">Risk / Reward (RR)</td>
+          <td class="value yellow" colspan="2"><span id="rr">4.58</span></td>
+        </tr>
+        <tr class="hl">
+          <td class="label">Margin (Cost)</td>
+          <td class="value green" colspan="2">$ <span id="margin">416.67</span></td>
+        </tr>
+        <tr class="hl">
+          <td class="label">Max Position Size</td>
+          <td class="value blue" colspan="2">$ <span id="posSize">2083.33</span></td>
+        </tr>
+      </table>
+    </div>
+
+  </div>
+
+  <!-- ══ Stage Comparison ══ -->
+  <div>
+    <h2 style="margin-bottom:14px">Prop Firm Rules</h2>
+    <div class="stage-grid">
+
+      <!-- ── Stage 1 ── -->
+      <div class="stage-card">
+        <div class="stage-header s1">Stage 1</div>
+        <table>
+          <tr>
+            <td class="label">Profit Target</td>
+            <td class="value green"><input type="number" id="s1ProfitPct" value="8" min="0" max="100" step="0.1" /> %</td>
+          </tr>
+          <tr>
+            <td class="label">Target $</td>
+            <td class="value green">$ <span id="s1ProfitAmt">800.00</span></td>
+          </tr>
+          <tr>
+            <td class="label">Max Daily Loss</td>
+            <td class="value red"><input type="number" id="s1DailyPct" value="5" min="0" max="100" step="0.1" /> %</td>
+          </tr>
+          <tr>
+            <td class="label">Max Daily Loss $</td>
+            <td class="value red">$ <span id="s1DailyAmt">500.00</span></td>
+          </tr>
+          <tr>
+            <td class="label">Max Loss</td>
+            <td class="value red"><input type="number" id="s1MaxLossPct" value="10" min="0" max="100" step="0.1" /> %</td>
+          </tr>
+          <tr>
+            <td class="label">Max Loss $</td>
+            <td class="value red">$ <span id="s1MaxLossAmt">1000.00</span></td>
+          </tr>
+
+          <tr class="divider"><td colspan="2">Balance &amp; Equity</td></tr>
+
+          <tr>
+            <td class="label">Current Balance</td>
+            <td class="value">$ <input type="number" id="s1Balance" value="9992" min="0" step="1" /></td>
+          </tr>
+          <tr>
+            <td class="label">Current Equity</td>
+            <td class="value">$ <input type="number" id="s1Equity" value="10000" min="0" step="1" /></td>
+          </tr>
+          <tr>
+            <td class="label">Initial Account Size</td>
+            <td class="value">$ <span id="s1InitAmt">10000.00</span></td>
+          </tr>
+
+          <tr class="divider"><td colspan="2">Risk Limits</td></tr>
+
+          <tr class="hl">
+            <td class="label">Min Account Balance</td>
+            <td class="value red">$ <span id="s1MinBal">9000.00</span></td>
+          </tr>
+          <tr class="hl">
+            <td class="label">Max Loss From Balance</td>
+            <td class="value white">$ <span id="s1MaxLossFromBal">992.00</span></td>
+          </tr>
+          <tr class="hl">
+            <td class="label">Max Daily Loss From Bal</td>
+            <td class="value red">$ <span id="s1DailyFromBal">500.00</span></td>
+          </tr>
+          <tr>
+            <td class="label">Profit Target (demo)</td>
+            <td class="value white">$ <span id="s1DemoProfitAmt">800.00</span></td>
+          </tr>
+          <tr>
+            <td class="label">Fee / Trade</td>
+            <td class="value"><input type="number" id="s1Fee" value="0.08" min="0" max="10" step="0.01" /> %</td>
+          </tr>
+          <tr>
+            <td class="label">Max Risk / Trade</td>
+            <td class="value"><input type="number" id="s1RiskPct" value="0.50" min="0" max="100" step="0.01" /> %</td>
+          </tr>
+          <tr class="hl">
+            <td class="label">Max Risk, SL / Trade</td>
+            <td class="value white">$ <span id="s1RiskAmt">49.96</span></td>
+          </tr>
+          <tr class="hl">
+            <td class="label">Losing Trades (Daily DD)</td>
+            <td class="value yellow"><span id="s1LossDailyTrades">10</span></td>
+          </tr>
+          <tr class="hl">
+            <td class="label">Losing Trades (Max DD)</td>
+            <td class="value yellow"><span id="s1LossMaxTrades">20</span></td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- ── Stage 2 ── -->
+      <div class="stage-card">
+        <div class="stage-header s2">Stage 2</div>
+        <table>
+          <tr>
+            <td class="label">Profit Target</td>
+            <td class="value green"><input type="number" id="s2ProfitPct" value="5" min="0" max="100" step="0.1" /> %</td>
+          </tr>
+          <tr>
+            <td class="label">Target $</td>
+            <td class="value green">$ <span id="s2ProfitAmt">500.00</span></td>
+          </tr>
+          <tr>
+            <td class="label">Max Daily Loss</td>
+            <td class="value red"><input type="number" id="s2DailyPct" value="5" min="0" max="100" step="0.1" /> %</td>
+          </tr>
+          <tr>
+            <td class="label">Max Daily Loss $</td>
+            <td class="value red">$ <span id="s2DailyAmt">500.00</span></td>
+          </tr>
+          <tr>
+            <td class="label">Max Loss</td>
+            <td class="value red"><input type="number" id="s2MaxLossPct" value="8" min="0" max="100" step="0.1" /> %</td>
+          </tr>
+          <tr>
+            <td class="label">Max Loss $</td>
+            <td class="value red">$ <span id="s2MaxLossAmt">800.00</span></td>
+          </tr>
+
+          <tr class="divider"><td colspan="2">Balance &amp; Equity</td></tr>
+
+          <tr>
+            <td class="label">Current Balance</td>
+            <td class="value">$ <input type="number" id="s2Balance" value="10000" min="0" step="1" /></td>
+          </tr>
+          <tr>
+            <td class="label">Current Equity</td>
+            <td class="value">$ <input type="number" id="s2Equity" value="10000" min="0" step="1" /></td>
+          </tr>
+          <tr>
+            <td class="label">Initial Account Size</td>
+            <td class="value">$ <span id="s2InitAmt">10000.00</span></td>
+          </tr>
+
+          <tr class="divider"><td colspan="2">Risk Limits</td></tr>
+
+          <tr class="hl">
+            <td class="label">Min Account Balance</td>
+            <td class="value red">$ <span id="s2MinBal">9200.00</span></td>
+          </tr>
+          <tr class="hl">
+            <td class="label">Max Loss From Balance</td>
+            <td class="value white">$ <span id="s2MaxLossFromBal">800.00</span></td>
+          </tr>
+          <tr class="hl">
+            <td class="label">Max Daily Loss From Bal</td>
+            <td class="value red">$ <span id="s2DailyFromBal">500.00</span></td>
+          </tr>
+          <tr>
+            <td class="label">Profit Target (demo)</td>
+            <td class="value white">$ <span id="s2DemoProfitAmt">500.00</span></td>
+          </tr>
+          <tr>
+            <td class="label">Fee / Trade</td>
+            <td class="value"><input type="number" id="s2Fee" value="0.08" min="0" max="10" step="0.01" /> %</td>
+          </tr>
+          <tr>
+            <td class="label">Max Risk / Trade</td>
+            <td class="value"><input type="number" id="s2RiskPct" value="0.50" min="0" max="100" step="0.01" /> %</td>
+          </tr>
+          <tr class="hl">
+            <td class="label">Max Risk, SL / Trade</td>
+            <td class="value white">$ <span id="s2RiskAmt">50.00</span></td>
+          </tr>
+          <tr class="hl">
+            <td class="label">Losing Trades (Daily DD)</td>
+            <td class="value yellow"><span id="s2LossDailyTrades">10</span></td>
+          </tr>
+          <tr class="hl">
+            <td class="label">Losing Trades (Max DD)</td>
+            <td class="value yellow"><span id="s2LossMaxTrades">16</span></td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- ── Trader ── -->
+      <div class="stage-card">
+        <div class="stage-header trader">Trader</div>
+        <table>
+          <tr>
+            <td class="label">Profit Target</td>
+            <td class="value muted">Unlimited</td>
+          </tr>
+          <tr>
+            <td class="label">Target $</td>
+            <td class="value muted">—</td>
+          </tr>
+          <tr>
+            <td class="label">Max Daily Loss</td>
+            <td class="value red"><input type="number" id="trDailyPct" value="5" min="0" max="100" step="0.1" /> %</td>
+          </tr>
+          <tr>
+            <td class="label">Max Daily Loss $</td>
+            <td class="value red">$ <span id="trDailyAmt">500.00</span></td>
+          </tr>
+          <tr>
+            <td class="label">Max Loss</td>
+            <td class="value red"><input type="number" id="trMaxLossPct" value="8" min="0" max="100" step="0.1" /> %</td>
+          </tr>
+          <tr>
+            <td class="label">Max Loss $</td>
+            <td class="value red">$ <span id="trMaxLossAmt">800.00</span></td>
+          </tr>
+
+          <tr class="divider"><td colspan="2">Balance &amp; Equity</td></tr>
+
+          <tr>
+            <td class="label">Current Balance</td>
+            <td class="value">$ <input type="number" id="trBalance" value="10000" min="0" step="1" /></td>
+          </tr>
+          <tr>
+            <td class="label">Current Equity</td>
+            <td class="value">$ <input type="number" id="trEquity" value="10000" min="0" step="1" /></td>
+          </tr>
+          <tr>
+            <td class="label">Initial Account Size</td>
+            <td class="value">$ <span id="trInitAmt">10000.00</span></td>
+          </tr>
+
+          <tr class="divider"><td colspan="2">Risk Limits</td></tr>
+
+          <tr class="hl">
+            <td class="label">Min Account Balance</td>
+            <td class="value red">$ <span id="trMinBal">9200.00</span></td>
+          </tr>
+          <tr class="hl">
+            <td class="label">Max Loss From Balance</td>
+            <td class="value white">$ <span id="trMaxLossFromBal">800.00</span></td>
+          </tr>
+          <tr class="hl">
+            <td class="label">Max Daily Loss From Bal</td>
+            <td class="value red">$ <span id="trDailyFromBal">500.00</span></td>
+          </tr>
+          <tr>
+            <td class="label">Profit Target (demo)</td>
+            <td class="value white">$ <span id="trDemoProfitAmt">500.00</span></td>
+          </tr>
+          <tr>
+            <td class="label">Fee / Trade</td>
+            <td class="value"><input type="number" id="trFee" value="0.08" min="0" max="10" step="0.01" /> %</td>
+          </tr>
+          <tr>
+            <td class="label">Max Risk / Trade</td>
+            <td class="value"><input type="number" id="trRiskPct" value="0.50" min="0" max="100" step="0.01" /> %</td>
+          </tr>
+          <tr class="hl">
+            <td class="label">Max Risk, SL / Trade</td>
+            <td class="value white">$ <span id="trRiskAmt">50.00</span></td>
+          </tr>
+          <tr class="hl">
+            <td class="label">Losing Trades (Daily DD)</td>
+            <td class="value yellow"><span id="trLossDailyTrades">10</span></td>
+          </tr>
+          <tr class="hl">
+            <td class="label">Losing Trades (Max DD)</td>
+            <td class="value yellow"><span id="trLossMaxTrades">16</span></td>
+          </tr>
+        </table>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+  const el  = id => document.getElementById(id);
+  const val = id => parseFloat(el(id)?.value) || 0;
+  const fmt = (n, d = 2) => n.toLocaleString('en-ZA', { minimumFractionDigits: d, maximumFractionDigits: d });
+  const set = (id, txt) => { const e = el(id); if (e) e.textContent = txt; };
+
+  function calcPosition() {
+    const account  = val('accountSize');
+    const leverage = val('leverage') || 1;
+    const riskPct  = val('riskPct');
+    const slPct    = val('slPct') || 0.0001;
+    const tpPct    = val('tpPct');
+
+    const riskAmt = account * riskPct / 100;
+    const posSize = riskAmt / (slPct / 100);
+    const margin  = posSize / leverage;
+    const tpAmt   = posSize * tpPct / 100;
+    const rr      = tpPct / slPct;
+
+    set('riskAmt', fmt(riskAmt));
+    set('tpAmt',   fmt(tpAmt));
+    set('rr',      fmt(rr));
+    set('margin',  fmt(margin));
+    set('posSize', fmt(posSize));
+
+    return account;
+  }
+
+  function calcStage(pfx, account) {
+    const profitPct  = val(pfx + 'ProfitPct');
+    const dailyPct   = val(pfx + 'DailyPct');
+    const maxLossPct = val(pfx + 'MaxLossPct');
+    const balance    = val(pfx + 'Balance');
+    const riskTrdPct = val(pfx + 'RiskPct');
+
+    const profitAmt      = account * profitPct / 100;
+    const dailyAmt       = account * dailyPct / 100;
+    const maxLossAmt     = account * maxLossPct / 100;
+    const minBal         = account - maxLossAmt;
+    const maxLossFromBal = balance - minBal;
+
+    // Max risk per trade = riskPct % of current balance (fees are informational)
+    const riskAmt    = balance * riskTrdPct / 100;
+    const lossDaily  = riskAmt > 0 ? Math.round(dailyAmt / riskAmt) : 0;
+    const lossMax    = riskAmt > 0 ? Math.round(maxLossFromBal / riskAmt) : 0;
+
+    set(pfx + 'ProfitAmt',      fmt(profitAmt));
+    set(pfx + 'DailyAmt',       fmt(dailyAmt));
+    set(pfx + 'MaxLossAmt',     fmt(maxLossAmt));
+    set(pfx + 'InitAmt',        fmt(account));
+    set(pfx + 'MinBal',         fmt(minBal));
+    set(pfx + 'MaxLossFromBal', fmt(maxLossFromBal));
+    set(pfx + 'DailyFromBal',   fmt(dailyAmt));
+    set(pfx + 'DemoProfitAmt',  fmt(profitAmt));
+    set(pfx + 'RiskAmt',        fmt(riskAmt));
+    set(pfx + 'LossDailyTrades', lossDaily);
+    set(pfx + 'LossMaxTrades',   lossMax);
+  }
+
+  function recalcAll() {
+    const account = calcPosition();
+    calcStage('s1', account);
+    calcStage('s2', account);
+    calcStage('tr', account);
+  }
+
+  document.querySelectorAll('input[type="number"]').forEach(e => e.addEventListener('input', recalcAll));
+  recalcAll();
+</script>
+</body>
+</html>

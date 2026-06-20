@@ -98,8 +98,8 @@
   <div class="toolbar">
     <button id="refresh">Refresh</button>
     <span class="toggles">
-      <label><input type="checkbox" id="toggle1d" checked> 1D columns</label>
       <label><input type="checkbox" id="toggle4h" checked> 4H columns</label>
+      <label><input type="checkbox" id="toggle1d" checked> 1D columns</label>
     </span>
     <span id="status">Loading…</span>
     <span id="progress"></span>
@@ -117,12 +117,12 @@
         <th data-sort="symbol">Symbol <span class="arrow"></span></th>
         <th class="num" data-sort="price">Price <span class="arrow"></span></th>
         <th class="num" data-sort="change">Day % <span class="arrow"></span></th>
-        <th class="col-1d" data-sort="d1">1D Trend <span class="arrow"></span></th>
-        <th class="num col-1d" data-sort="d1pnl">1D PnL <span class="arrow"></span></th>
-        <th class="col-1d" data-sort="d1flip">1D Flip <span class="arrow"></span></th>
         <th class="col-4h" data-sort="h4">4H Trend <span class="arrow"></span></th>
         <th class="num col-4h" data-sort="h4pnl">4H PnL <span class="arrow"></span></th>
         <th class="col-4h" data-sort="h4flip">4H Flip <span class="arrow"></span></th>
+        <th class="col-1d" data-sort="d1">1D Trend <span class="arrow"></span></th>
+        <th class="num col-1d" data-sort="d1pnl">1D PnL <span class="arrow"></span></th>
+        <th class="col-1d" data-sort="d1flip">1D Flip <span class="arrow"></span></th>
         <th>Chart</th>
       </tr>
     </thead>
@@ -309,7 +309,7 @@ function renderSummary() {
         </div>
       </div>`;
   };
-  $("summary").innerHTML = block("1D Timeframe", tally("d1")) + block("4H Timeframe", tally("h4"));
+  $("summary").innerHTML = block("4H Timeframe", tally("h4")) + block("1D Timeframe", tally("d1"));
 }
 
 function renderTable() {
@@ -327,12 +327,12 @@ function renderTable() {
       <td class="sym">${a.pair}</td>
       <td class="num">${fmtPrice(a.price)}</td>
       <td class="num">${fmtChange(a.change)}</td>
-      <td class="col-1d">${badge(a.d1)}</td>
-      <td class="num col-1d">${fmtChange(a.d1pnl)}</td>
-      <td class="col-1d">${fmtDate(a.d1flip)}</td>
       <td class="col-4h">${badge(a.h4)}</td>
       <td class="num col-4h">${fmtChange(a.h4pnl)}</td>
       <td class="col-4h">${fmtDateTime(a.h4flip)}</td>
+      <td class="col-1d">${badge(a.d1)}</td>
+      <td class="num col-1d">${fmtChange(a.d1pnl)}</td>
+      <td class="col-1d">${fmtDate(a.d1flip)}</td>
       <td><a class="chart" href="https://www.tradingview.com/chart/?symbol=BINANCE:${a.pair}" target="_blank" rel="noopener">open ↗</a></td>
     </tr>`).join("");
 

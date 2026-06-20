@@ -49,6 +49,7 @@
   }
   .auto { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; }
   #nextRefresh { color: var(--muted); font-size: 13px; }
+  #alertStatus { color: var(--muted); font-size: 13px; }
   #status { color: var(--muted); font-size: 13px; }
   #progress { color: var(--muted); font-size: 13px; }
 
@@ -141,6 +142,19 @@
     <span id="progress"></span>
   </div>
 
+  <div class="toolbar">
+    <label class="auto"><input type="checkbox" id="discordEnabled"> Discord alerts</label>
+    <input type="text" id="discordUrl" placeholder="Discord webhook URL" style="min-width:340px">
+    <button id="testWebhook">Test</button>
+    <span class="toggles" id="alertTfs">alert on:
+      <label><input type="checkbox" id="alert_m15"> 15m</label>
+      <label><input type="checkbox" id="alert_h1"> 1H</label>
+      <label><input type="checkbox" id="alert_h4"> 4H</label>
+      <label><input type="checkbox" id="alert_d1"> 1D</label>
+    </span>
+    <span id="alertStatus"></span>
+  </div>
+
   <div class="watchlist" id="watchlist"></div>
 
   <div class="err-banner" id="errBanner"></div>
@@ -178,7 +192,16 @@ const CONCURRENCY = 8;
 const KLINE_LIMIT = 200;
 
 const LS_KEY = "breakout_watchlist";
+const LS_DISCORD_URL = "breakout_discord_url";
+const LS_DISCORD_ON = "breakout_discord_on";
+const LS_ALERT_TFS = "breakout_alert_tfs";
 const DEFAULT_WATCHLIST = ["BTC", "ETH", "SOL", "BNB", "XRP"];
+const TF_META = [
+  { key: "m15", label: "15m" },
+  { key: "h1", label: "1H" },
+  { key: "h4", label: "4H" },
+  { key: "d1", label: "1D" },
+];
 const BREAKOUT_MAX_CANDLES = 10; // breakout badge expires this many candles after the 50 EMA cross
 
 // CoinGecko symbol -> Binance base asset override where they differ.
@@ -529,6 +552,7 @@ async function refresh() {
     assets = candidates;
     renderSummary();
     renderTable();
+    await checkAlerts(candidates);
     const now = new Date();
     $("status").textContent = `${tradables.length} asset(s) · last updated ${now.toLocaleString()}`;
     $("progress").textContent = "";
@@ -574,6 +598,61 @@ function tickAuto() {
   $("nextRefresh").textContent = `next in ${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
+// ---- Discord alerts -----------------------------------------------------
+// Track the last seen trend per symbol+timeframe so we only alert on the
+// transition INTO a breakout, not on every refresh while it persists.
+let prevTrend = {};
+let alertsPrimed = false; // first populated scan just seeds the baseline
+
+function isBreakout(s) { return s === "bull-breakout" || s === "bear-breakout"; }
+function tfAlertOn(key) { const el = $("alert_" + key); return el ? el.checked : true; }
+
+function plainPrice(p) {
+  if (p == null || isNaN(p)) return "—";
+  if (p >= 1000) return "$" + p.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  if (p >= 1) return "$" + p.toFixed(2);
+  if (p >= 0.01) return "$" + p.toFixed(4);
+  return "$" + p.toPrecision(3);
+}
+
+async function sendDiscord(url, items) {
+  const lines = items.map((it) => {
+    const arrow = it.state === "bull-breakout" ? "▲" : "▼";
+    const dir = it.state === "bull-breakout" ? "bull" : "bear";
+    return `${arrow} **${it.symbol}** ${it.tf} ${dir} breakout — ${plainPrice(it.price)} · <https://www.tradingview.com/chart/?symbol=BINANCE:${it.pair}>`;
+  });
+  const content = ("🚨 **Breakout alert**\n" + lines.join("\n")).slice(0, 1990);
+  try {
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    });
+    $("alertStatus").textContent = `sent ${items.length} alert(s) · ${new Date().toLocaleTimeString()}`;
+  } catch (e) {
+    $("alertStatus").textContent = `alert send failed: ${e.message}`;
+  }
+}
+
+async function checkAlerts(list) {
+  const fresh = [];
+  for (const a of list) {
+    if (!a.tradable) continue;
+    for (const tf of TF_META) {
+      const cur = a[tf.key];
+      const k = a.symbol + "|" + tf.key;
+      if (isBreakout(cur) && cur !== prevTrend[k] && tfAlertOn(tf.key)) {
+        fresh.push({ symbol: a.symbol, pair: a.pair, tf: tf.label, state: cur, price: a.price });
+      }
+      prevTrend[k] = cur;
+    }
+  }
+  if (!alertsPrimed) { alertsPrimed = true; return; } // seed baseline silently
+  if (!fresh.length || !$("discordEnabled").checked) return;
+  const url = $("discordUrl").value.trim();
+  if (url) await sendDiscord(url, fresh);
+}
+
 // ---- Events -------------------------------------------------------------
 document.querySelectorAll("thead th[data-sort]").forEach((th) => {
   th.addEventListener("click", () => {
@@ -588,12 +667,44 @@ $("addBtn").addEventListener("click", () => { addSymbols($("symbolInput").value)
 $("symbolInput").addEventListener("keydown", (e) => {
   if (e.key === "Enter") { addSymbols($("symbolInput").value); $("symbolInput").value = ""; }
 });
+$("discordEnabled").addEventListener("change", (e) => localStorage.setItem(LS_DISCORD_ON, e.target.checked ? "1" : "0"));
+$("discordUrl").addEventListener("change", (e) => localStorage.setItem(LS_DISCORD_URL, e.target.value.trim()));
+$("testWebhook").addEventListener("click", async () => {
+  const url = $("discordUrl").value.trim();
+  if (!url) { $("alertStatus").textContent = "Enter a webhook URL first."; return; }
+  try {
+    await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: "✅ Breakout Scanner test alert" }),
+    });
+    $("alertStatus").textContent = `test sent · ${new Date().toLocaleTimeString()}`;
+  } catch (e) {
+    $("alertStatus").textContent = `test failed: ${e.message}`;
+  }
+});
 $("autoRefresh").addEventListener("change", (e) => e.target.checked ? startAuto() : stopAuto());
 $("intervalMin").addEventListener("change", () => { if ($("autoRefresh").checked) startAuto(); });
 $("toggle15m").addEventListener("change", (e) => document.body.classList.toggle("hide-15m", !e.target.checked));
 $("toggle1h").addEventListener("change", (e) => document.body.classList.toggle("hide-1h", !e.target.checked));
 $("toggle4h").addEventListener("change", (e) => document.body.classList.toggle("hide-4h", !e.target.checked));
 $("toggle1d").addEventListener("change", (e) => document.body.classList.toggle("hide-1d", !e.target.checked));
+
+$("discordUrl").value = localStorage.getItem(LS_DISCORD_URL) || "";
+$("discordEnabled").checked = localStorage.getItem(LS_DISCORD_ON) === "1";
+
+function saveAlertTfs() {
+  const o = {};
+  for (const tf of TF_META) o[tf.key] = $("alert_" + tf.key).checked;
+  localStorage.setItem(LS_ALERT_TFS, JSON.stringify(o));
+}
+let savedTfs = {};
+try { savedTfs = JSON.parse(localStorage.getItem(LS_ALERT_TFS)) || {}; } catch (e) {}
+for (const tf of TF_META) {
+  const el = $("alert_" + tf.key);
+  el.checked = savedTfs[tf.key] !== false; // default on
+  el.addEventListener("change", saveAlertTfs);
+}
 
 renderChips();
 refresh();

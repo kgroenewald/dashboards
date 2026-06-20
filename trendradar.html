@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crypto Trend Radar — 5/20 EMA</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel-alt: #1c2230;
+    --border: #2a3038;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --bull: #2ec27e;
+    --bull-bg: rgba(46, 194, 126, 0.12);
+    --bear: #f04f5b;
+    --bear-bg: rgba(240, 79, 91, 0.12);
+    --accent: #388bfd;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px;
+  }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 13px; margin: 0 0 20px; }
+  .toolbar {
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 18px;
+  }
+  button {
+    background: var(--accent); color: #fff; border: none; border-radius: 6px;
+    padding: 9px 18px; font-size: 14px; font-weight: 600; cursor: pointer;
+  }
+  button:disabled { opacity: 0.55; cursor: default; }
+  #status { color: var(--muted); font-size: 13px; }
+  #progress { color: var(--muted); font-size: 13px; }
+
+  .summary { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 20px; min-width: 230px;
+  }
+  .card h2 { font-size: 13px; color: var(--muted); margin: 0 0 12px; font-weight: 600; letter-spacing: 0.4px; text-transform: uppercase; }
+  .bars { display: flex; flex-direction: column; gap: 8px; }
+  .barrow { display: flex; align-items: center; gap: 10px; font-size: 13px; }
+  .barrow .lbl { width: 64px; }
+  .track { flex: 1; height: 16px; background: var(--panel-alt); border-radius: 8px; overflow: hidden; display: flex; }
+  .fill-bull { background: var(--bull); height: 100%; }
+  .fill-bear { background: var(--bear); height: 100%; }
+  .barrow .val { width: 96px; text-align: right; color: var(--muted); }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  thead th {
+    text-align: left; color: var(--muted); font-weight: 600; font-size: 12px;
+    text-transform: uppercase; letter-spacing: 0.4px; padding: 10px 12px;
+    border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; white-space: nowrap;
+  }
+  thead th:hover { color: var(--text); }
+  thead th .arrow { color: var(--accent); }
+  tbody td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+  tbody tr:hover { background: var(--panel); }
+  .asset-name { font-weight: 600; }
+  .sym { color: var(--muted); font-size: 13px; }
+  .badge {
+    display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 700;
+  }
+  .badge.bull { color: var(--bull); background: var(--bull-bg); }
+  .badge.bear { color: var(--bear); background: var(--bear-bg); }
+  .badge.err  { color: var(--muted); background: var(--panel-alt); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  th.num { text-align: right; }
+  .chg.pos { color: var(--bull); }
+  .chg.neg { color: var(--bear); }
+  .muted { color: var(--muted); }
+  body.hide-1d .col-1d { display: none; }
+  body.hide-4h .col-4h { display: none; }
+  .toggles { display: flex; gap: 12px; font-size: 13px; color: var(--muted); }
+  .toggles label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
+  a.chart { color: var(--accent); text-decoration: none; }
+  a.chart:hover { text-decoration: underline; }
+  .err-banner {
+    background: var(--bear-bg); border: 1px solid var(--bear); color: var(--text);
+    padding: 12px 16px; border-radius: 8px; margin-bottom: 18px; font-size: 14px; display: none;
+  }
+</style>
+</head>
+<body>
+  <h1>Crypto Trend Radar</h1>
+  <p class="sub">Top 50 by market cap · Trend = 5&nbsp;EMA vs 20&nbsp;EMA (close) on each timeframe · Bullish when 5&nbsp;EMA&nbsp;&gt;&nbsp;20&nbsp;EMA</p>
+
+  <div class="toolbar">
+    <button id="refresh">Refresh</button>
+    <span class="toggles">
+      <label><input type="checkbox" id="toggle1d" checked> 1D columns</label>
+      <label><input type="checkbox" id="toggle4h" checked> 4H columns</label>
+    </span>
+    <span id="status">Loading…</span>
+    <span id="progress"></span>
+  </div>
+
+  <div class="err-banner" id="errBanner"></div>
+
+  <div class="summary" id="summary"></div>
+
+  <table>
+    <thead>
+      <tr>
+        <th data-sort="rank">Rank <span class="arrow"></span></th>
+        <th data-sort="name">Asset <span class="arrow"></span></th>
+        <th data-sort="symbol">Symbol <span class="arrow"></span></th>
+        <th class="num" data-sort="price">Price <span class="arrow"></span></th>
+        <th class="num" data-sort="change">Day % <span class="arrow"></span></th>
+        <th class="col-1d" data-sort="d1">1D Trend <span class="arrow"></span></th>
+        <th class="num col-1d" data-sort="d1pnl">1D PnL <span class="arrow"></span></th>
+        <th class="col-1d" data-sort="d1flip">1D Flip <span class="arrow"></span></th>
+        <th class="col-4h" data-sort="h4">4H Trend <span class="arrow"></span></th>
+        <th class="num col-4h" data-sort="h4pnl">4H PnL <span class="arrow"></span></th>
+        <th class="col-4h" data-sort="h4flip">4H Flip <span class="arrow"></span></th>
+        <th>Chart</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+
+<script>
+// Pull deep into the ranking (250) so that after dropping stablecoins and
+// coins not on Binance spot, we can still fill TARGET_COUNT tradable assets.
+const COINGECKO_URL = "https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1&sparkline=false";
+const BINANCE = "https://api.binance.com";
+const CONCURRENCY = 8;
+const KLINE_LIMIT = 200;
+const TARGET_COUNT = 50;
+
+// USD stablecoins have no meaningful trend. Any "*USD*" ticker is a USD peg
+// (USDT, USDC, RLUSD, PYUSD, USDS, USD1, … and any future ones); DAI and FRAX
+// are the only common USD pegs whose ticker lacks "USD". Gold tokens (XAUT,
+// PAXG) are not pegged to $1 and are kept.
+const NON_USD_STABLES = new Set(["DAI", "FRAX"]);
+function isStablecoin(sym) {
+  return sym.includes("USD") || NON_USD_STABLES.has(sym);
+}
+
+// CoinGecko symbol -> Binance base asset override where they differ.
+const SYMBOL_OVERRIDE = {
+  // (none needed for the typical top-50; add here if a mapping breaks)
+};
+
+let assets = [];      // [{rank, name, symbol, pair, d1, h4}]
+let sortKey = "rank";
+let sortDir = 1;      // 1 asc, -1 desc
+
+const $ = (id) => document.getElementById(id);
+
+// ---- EMA ----------------------------------------------------------------
+function emaSeries(values, length) {
+  const out = new Array(values.length).fill(null);
+  if (values.length < length) return out;
+  const k = 2 / (length + 1);
+  let prev = 0; // SMA seed over first `length` values
+  for (let i = 0; i < length; i++) prev += values[i];
+  prev /= length;
+  out[length - 1] = prev;
+  for (let i = length; i < values.length; i++) {
+    prev = values[i] * k + prev * (1 - k);
+    out[i] = prev;
+  }
+  return out;
+}
+
+// Returns { trend, pnl }. pnl is the price % move since the most recent 5/20
+// EMA cross (current price vs the close at the flip bar): positive = price is
+// up since the flip, negative = down — independent of trend direction.
+function analyzeTrend(closes) {
+  const last = closes.length - 1;
+  const e5 = emaSeries(closes, 5);
+  const e20 = emaSeries(closes, 20);
+  if (last < 0 || e5[last] == null || e20[last] == null) return { trend: "err", pnl: null, flipIdx: null };
+  const bull = e5[last] > e20[last];
+
+  // Walk back to the bar where the EMA relationship last flipped.
+  let flipIdx = null;
+  for (let i = last; i >= 1 && e5[i - 1] != null && e20[i - 1] != null; i--) {
+    if ((e5[i] > e20[i]) !== (e5[i - 1] > e20[i - 1])) { flipIdx = i; break; }
+  }
+
+  let pnl = null;
+  if (flipIdx != null && closes[flipIdx]) {
+    pnl = ((closes[last] - closes[flipIdx]) / closes[flipIdx]) * 100;
+  }
+  return { trend: bull ? "bull" : "bear", pnl, flipIdx };
+}
+
+// ---- Throttled map ------------------------------------------------------
+async function throttle(items, limit, worker, onProgress) {
+  const results = new Array(items.length);
+  let idx = 0, done = 0;
+  async function run() {
+    while (idx < items.length) {
+      const cur = idx++;
+      try { results[cur] = await worker(items[cur], cur); }
+      catch (e) { results[cur] = { error: e }; }
+      done++;
+      if (onProgress) onProgress(done, items.length);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, run));
+  return results;
+}
+
+// ---- Data fetch ---------------------------------------------------------
+async function fetchJSON(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+  return r.json();
+}
+
+async function getTopCoins() {
+  return fetchJSON(COINGECKO_URL); // [{symbol, name, market_cap_rank, ...}]
+}
+
+async function getBinanceUsdtPairs() {
+  const info = await fetchJSON(`${BINANCE}/api/v3/exchangeInfo`);
+  const set = new Set();
+  for (const s of info.symbols) {
+    if (s.quoteAsset === "USDT" && s.status === "TRADING") set.add(s.baseAsset);
+  }
+  return set;
+}
+
+async function getKlines(pair, interval) {
+  const url = `${BINANCE}/api/v3/klines?symbol=${pair}&interval=${interval}&limit=${KLINE_LIMIT}`;
+  return fetchJSON(url); // each: [openTime, open, high, low, close, volume, ...]
+}
+
+// ---- Render -------------------------------------------------------------
+function badge(state) {
+  if (state === "bull") return '<span class="badge bull">BULLISH</span>';
+  if (state === "bear") return '<span class="badge bear">BEARISH</span>';
+  return '<span class="badge err">—</span>';
+}
+
+function fmtPrice(p) {
+  if (p == null || isNaN(p)) return '<span class="muted">—</span>';
+  if (p >= 1000) return '$' + p.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  if (p >= 1) return '$' + p.toFixed(2);
+  if (p >= 0.01) return '$' + p.toFixed(4);
+  return '$' + p.toPrecision(3);
+}
+
+function fmtDate(ms) {
+  if (ms == null) return '<span class="muted">—</span>';
+  return new Date(ms).toISOString().slice(0, 10); // daily bar opens 00:00 UTC
+}
+
+function fmtDateTime(ms) {
+  if (ms == null) return '<span class="muted">—</span>';
+  return new Date(ms).toISOString().slice(0, 16).replace("T", " ") + " UTC";
+}
+
+function fmtChange(c) {
+  if (c == null || isNaN(c)) return '<span class="muted">—</span>';
+  const cls = c >= 0 ? 'pos' : 'neg';
+  const sign = c >= 0 ? '+' : '';
+  return `<span class="chg ${cls}">${sign}${c.toFixed(2)}%</span>`;
+}
+
+function renderSummary() {
+  const tally = (key) => {
+    let bull = 0, bear = 0;
+    for (const a of assets) {
+      if (a[key] === "bull") bull++;
+      else if (a[key] === "bear") bear++;
+    }
+    return { bull, bear, total: bull + bear };
+  };
+  const block = (title, t) => {
+    const bp = t.total ? Math.round((t.bull / t.total) * 100) : 0;
+    const rp = 100 - bp;
+    return `
+      <div class="card">
+        <h2>${title}</h2>
+        <div class="bars">
+          <div class="barrow">
+            <span class="lbl">Bullish</span>
+            <span class="track"><span class="fill-bull" style="width:${bp}%"></span></span>
+            <span class="val">${t.bull} (${bp}%)</span>
+          </div>
+          <div class="barrow">
+            <span class="lbl">Bearish</span>
+            <span class="track"><span class="fill-bear" style="width:${t.total ? rp : 0}%"></span></span>
+            <span class="val">${t.bear} (${t.total ? rp : 0}%)</span>
+          </div>
+        </div>
+      </div>`;
+  };
+  $("summary").innerHTML = block("1D Timeframe", tally("d1")) + block("4H Timeframe", tally("h4"));
+}
+
+function renderTable() {
+  const sorted = [...assets].sort((a, b) => {
+    let av = a[sortKey], bv = b[sortKey];
+    if (typeof av === "string") { av = av.toLowerCase(); bv = (bv || "").toLowerCase(); }
+    if (av < bv) return -1 * sortDir;
+    if (av > bv) return 1 * sortDir;
+    return 0;
+  });
+  $("rows").innerHTML = sorted.map((a) => `
+    <tr>
+      <td>${a.rank}</td>
+      <td class="asset-name">${a.name}</td>
+      <td class="sym">${a.pair}</td>
+      <td class="num">${fmtPrice(a.price)}</td>
+      <td class="num">${fmtChange(a.change)}</td>
+      <td class="col-1d">${badge(a.d1)}</td>
+      <td class="num col-1d">${fmtChange(a.d1pnl)}</td>
+      <td class="col-1d">${fmtDate(a.d1flip)}</td>
+      <td class="col-4h">${badge(a.h4)}</td>
+      <td class="num col-4h">${fmtChange(a.h4pnl)}</td>
+      <td class="col-4h">${fmtDateTime(a.h4flip)}</td>
+      <td><a class="chart" href="https://www.tradingview.com/chart/?symbol=BINANCE:${a.pair}" target="_blank" rel="noopener">open ↗</a></td>
+    </tr>`).join("");
+
+  document.querySelectorAll("thead th[data-sort]").forEach((th) => {
+    const arrow = th.querySelector(".arrow");
+    arrow.textContent = th.dataset.sort === sortKey ? (sortDir === 1 ? "▲" : "▼") : "";
+  });
+}
+
+// ---- Orchestration ------------------------------------------------------
+async function refresh() {
+  const btn = $("refresh");
+  btn.disabled = true;
+  $("errBanner").style.display = "none";
+  $("status").textContent = "Fetching market-cap list…";
+  $("progress").textContent = "";
+
+  try {
+    const [topCoins, usdtPairs] = await Promise.all([getTopCoins(), getBinanceUsdtPairs()]);
+
+    // Walk down the ranking, keeping tradable non-stablecoin pairs until we
+    // have TARGET_COUNT of them.
+    const candidates = [];
+    for (const c of topCoins) {
+      if (candidates.length >= TARGET_COUNT) break;
+      const sym = (c.symbol || "").toUpperCase();
+      if (isStablecoin(sym)) continue;
+      const base = SYMBOL_OVERRIDE[sym] || sym;
+      if (!usdtPairs.has(base)) continue;
+      candidates.push({
+        rank: c.market_cap_rank,
+        name: c.name,
+        symbol: sym,
+        pair: base + "USDT",
+        price: null,
+        change: null,
+        d1: "err",
+        d1pnl: null,
+        d1flip: null,
+        h4: "err",
+        h4pnl: null,
+        h4flip: null,
+      });
+    }
+
+    $("status").textContent = `Computing trends for ${candidates.length} assets…`;
+
+    await throttle(candidates, CONCURRENCY, async (a) => {
+      const [d1k, h4k] = await Promise.all([
+        getKlines(a.pair, "1d"),
+        getKlines(a.pair, "4h"),
+      ]);
+      const d1a = analyzeTrend(d1k.map((c) => parseFloat(c[4])));
+      const h4a = analyzeTrend(h4k.map((c) => parseFloat(c[4])));
+      a.d1 = d1a.trend; a.d1pnl = d1a.pnl;
+      a.h4 = h4a.trend; a.h4pnl = h4a.pnl;
+      a.d1flip = (d1a.flipIdx != null && d1k[d1a.flipIdx]) ? d1k[d1a.flipIdx][0] : null;
+      a.h4flip = (h4a.flipIdx != null && h4k[h4a.flipIdx]) ? h4k[h4a.flipIdx][0] : null;
+      // Current price and the day's move from the latest daily candle.
+      const last = d1k[d1k.length - 1];
+      if (last) {
+        const open = parseFloat(last[1]);
+        a.price = parseFloat(last[4]);
+        a.change = open ? ((a.price - open) / open) * 100 : null;
+      }
+      return a;
+    }, (done, total) => {
+      $("progress").textContent = `${done}/${total}`;
+    });
+
+    assets = candidates;
+    renderSummary();
+    renderTable();
+    const now = new Date();
+    $("status").textContent = `${assets.length} assets · last updated ${now.toLocaleString()}`;
+    $("progress").textContent = "";
+  } catch (e) {
+    const banner = $("errBanner");
+    banner.style.display = "block";
+    banner.textContent = `Failed to load data: ${e.message}. CoinGecko or Binance may be rate-limiting — wait a moment and Refresh.`;
+    $("status").textContent = "Error.";
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ---- Events -------------------------------------------------------------
+document.querySelectorAll("thead th[data-sort]").forEach((th) => {
+  th.addEventListener("click", () => {
+    const key = th.dataset.sort;
+    if (key === sortKey) sortDir *= -1;
+    else { sortKey = key; sortDir = 1; }
+    renderTable();
+  });
+});
+$("refresh").addEventListener("click", refresh);
+$("toggle1d").addEventListener("change", (e) => document.body.classList.toggle("hide-1d", !e.target.checked));
+$("toggle4h").addEventListener("change", (e) => document.body.classList.toggle("hide-4h", !e.target.checked));
+
+refresh();
+</script>
+</body>
+</html>

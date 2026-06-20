@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Crypto Breakout Scanner — 5/20 EMA · 1H & 15m</title>
+<title>Crypto Breakout Scanner — 5/20 EMA · 15m / 1H / 4H / 1D</title>
 <style>
   :root {
     --bg: #0d1117;
@@ -97,8 +97,10 @@
   .chg.pos { color: var(--bull); }
   .chg.neg { color: var(--bear); }
   .muted { color: var(--muted); }
-  body.hide-1h .col-1h { display: none; }
   body.hide-15m .col-15m { display: none; }
+  body.hide-1h .col-1h { display: none; }
+  body.hide-4h .col-4h { display: none; }
+  body.hide-1d .col-1d { display: none; }
   .toggles { display: flex; gap: 12px; font-size: 13px; color: var(--muted); }
   .toggles label { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
   a.chart { color: var(--accent); text-decoration: none; }
@@ -112,15 +114,17 @@
 <body>
   <p style="margin:0 0 12px"><a class="chart" href="index.html">← Dashboard Hub</a></p>
   <h1>Crypto Breakout Scanner</h1>
-  <p class="sub">Your watchlist · Trend = 5&nbsp;EMA vs 20&nbsp;EMA (close) on 1H &amp; 15m · <span style="color:var(--neutral)">Neutral</span> when price is inside the 20&nbsp;EMA high/low band (no breakout)</p>
+  <p class="sub">Your watchlist · Trend = 5&nbsp;EMA vs 20&nbsp;EMA (close) on 15m, 1H, 4H &amp; 1D · <span style="color:var(--neutral)">Neutral</span> when price is inside the 20&nbsp;EMA high/low band (no breakout)</p>
 
   <div class="toolbar">
     <input type="text" id="symbolInput" placeholder="Add symbols: BTC, ETH, SOL…">
     <button id="addBtn">Add</button>
     <button id="refresh">Refresh</button>
     <span class="toggles">
-      <label><input type="checkbox" id="toggle1h" checked> 1H columns</label>
       <label><input type="checkbox" id="toggle15m" checked> 15m columns</label>
+      <label><input type="checkbox" id="toggle1h" checked> 1H columns</label>
+      <label><input type="checkbox" id="toggle4h" checked> 4H columns</label>
+      <label><input type="checkbox" id="toggle1d" checked> 1D columns</label>
     </span>
     <span id="status">Loading…</span>
     <span id="progress"></span>
@@ -145,6 +149,12 @@
         <th class="col-1h" data-sort="h1">1H Trend <span class="arrow"></span></th>
         <th class="num col-1h" data-sort="h1pnl">1H PnL <span class="arrow"></span></th>
         <th class="col-1h" data-sort="h1flip">1H Flip <span class="arrow"></span></th>
+        <th class="col-4h" data-sort="h4">4H Trend <span class="arrow"></span></th>
+        <th class="num col-4h" data-sort="h4pnl">4H PnL <span class="arrow"></span></th>
+        <th class="col-4h" data-sort="h4flip">4H Flip <span class="arrow"></span></th>
+        <th class="col-1d" data-sort="d1">1D Trend <span class="arrow"></span></th>
+        <th class="num col-1d" data-sort="d1pnl">1D PnL <span class="arrow"></span></th>
+        <th class="col-1d" data-sort="d1flip">1D Flip <span class="arrow"></span></th>
         <th>Chart</th>
       </tr>
     </thead>
@@ -358,7 +368,11 @@ function renderSummary() {
         </div>
       </div>`;
   };
-  $("summary").innerHTML = block("1H Timeframe", tally("h1")) + block("15m Timeframe", tally("m15"));
+  $("summary").innerHTML =
+    block("15m Timeframe", tally("m15")) +
+    block("1H Timeframe", tally("h1")) +
+    block("4H Timeframe", tally("h4")) +
+    block("1D Timeframe", tally("d1"));
 }
 
 function renderTable() {
@@ -377,7 +391,7 @@ function renderTable() {
       <tr>
         <td class="asset-name">${a.symbol}</td>
         <td class="sym">${a.pair}</td>
-        <td class="num" colspan="9"><span class="muted">Not found on Binance spot (USDT)</span></td>
+        <td class="num" colspan="15"><span class="muted">Not found on Binance spot (USDT)</span></td>
       </tr>`;
     }
     return `
@@ -392,6 +406,12 @@ function renderTable() {
       <td class="col-1h">${badge(a.h1)}</td>
       <td class="num col-1h">${fmtChange(a.h1pnl)}</td>
       <td class="col-1h">${fmtDateTime(a.h1flip)}</td>
+      <td class="col-4h">${badge(a.h4)}</td>
+      <td class="num col-4h">${fmtChange(a.h4pnl)}</td>
+      <td class="col-4h">${fmtDateTime(a.h4flip)}</td>
+      <td class="col-1d">${badge(a.d1)}</td>
+      <td class="num col-1d">${fmtChange(a.d1pnl)}</td>
+      <td class="col-1d">${fmtDateTime(a.d1flip)}</td>
       <td><a class="chart" href="https://www.tradingview.com/chart/?symbol=BINANCE:${a.pair}" target="_blank" rel="noopener">open ↗</a></td>
     </tr>`;
   }).join("");
@@ -430,8 +450,10 @@ async function refresh() {
         tradable: usdtPairs.has(base),
         price: null,
         change: null,
-        h1: "err", h1pnl: null, h1flip: null,
         m15: "err", m15pnl: null, m15flip: null,
+        h1: "err", h1pnl: null, h1flip: null,
+        h4: "err", h4pnl: null, h4flip: null,
+        d1: "err", d1pnl: null, d1flip: null,
       };
     });
 
@@ -439,25 +461,24 @@ async function refresh() {
     $("status").textContent = `Scanning ${tradables.length} asset(s)…`;
 
     await throttle(tradables, CONCURRENCY, async (a) => {
-      const [h1k, m15k, ticker] = await Promise.all([
-        getKlines(a.pair, "1h"),
+      const [m15k, h1k, h4k, d1k, ticker] = await Promise.all([
         getKlines(a.pair, "15m"),
+        getKlines(a.pair, "1h"),
+        getKlines(a.pair, "4h"),
+        getKlines(a.pair, "1d"),
         getTicker(a.pair),
       ]);
-      const h1a = analyzeTrend(
-        h1k.map((c) => parseFloat(c[4])),
-        h1k.map((c) => parseFloat(c[2])),
-        h1k.map((c) => parseFloat(c[3])),
+      const analyze = (k) => analyzeTrend(
+        k.map((c) => parseFloat(c[4])),
+        k.map((c) => parseFloat(c[2])),
+        k.map((c) => parseFloat(c[3])),
       );
-      const m15a = analyzeTrend(
-        m15k.map((c) => parseFloat(c[4])),
-        m15k.map((c) => parseFloat(c[2])),
-        m15k.map((c) => parseFloat(c[3])),
-      );
-      a.h1 = h1a.trend; a.h1pnl = h1a.pnl;
-      a.m15 = m15a.trend; a.m15pnl = m15a.pnl;
-      a.h1flip = (h1a.flipIdx != null && h1k[h1a.flipIdx]) ? h1k[h1a.flipIdx][0] : null;
-      a.m15flip = (m15a.flipIdx != null && m15k[m15a.flipIdx]) ? m15k[m15a.flipIdx][0] : null;
+      const flipMs = (a, k) => (a.flipIdx != null && k[a.flipIdx]) ? k[a.flipIdx][0] : null;
+      const m15a = analyze(m15k), h1a = analyze(h1k), h4a = analyze(h4k), d1a = analyze(d1k);
+      a.m15 = m15a.trend; a.m15pnl = m15a.pnl; a.m15flip = flipMs(m15a, m15k);
+      a.h1 = h1a.trend;  a.h1pnl = h1a.pnl;  a.h1flip = flipMs(h1a, h1k);
+      a.h4 = h4a.trend;  a.h4pnl = h4a.pnl;  a.h4flip = flipMs(h4a, h4k);
+      a.d1 = d1a.trend;  a.d1pnl = d1a.pnl;  a.d1flip = flipMs(d1a, d1k);
       a.price = parseFloat(ticker.lastPrice);
       a.change = parseFloat(ticker.priceChangePercent);
       return a;
@@ -495,8 +516,10 @@ $("addBtn").addEventListener("click", () => { addSymbols($("symbolInput").value)
 $("symbolInput").addEventListener("keydown", (e) => {
   if (e.key === "Enter") { addSymbols($("symbolInput").value); $("symbolInput").value = ""; }
 });
-$("toggle1h").addEventListener("change", (e) => document.body.classList.toggle("hide-1h", !e.target.checked));
 $("toggle15m").addEventListener("change", (e) => document.body.classList.toggle("hide-15m", !e.target.checked));
+$("toggle1h").addEventListener("change", (e) => document.body.classList.toggle("hide-1h", !e.target.checked));
+$("toggle4h").addEventListener("change", (e) => document.body.classList.toggle("hide-4h", !e.target.checked));
+$("toggle1d").addEventListener("change", (e) => document.body.classList.toggle("hide-1d", !e.target.checked));
 
 renderChips();
 refresh();

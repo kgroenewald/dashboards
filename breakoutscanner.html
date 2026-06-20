@@ -623,11 +623,12 @@ async function sendDiscord(url, items) {
   });
   const content = ("🚨 **Breakout alert**\n" + lines.join("\n")).slice(0, 1990);
   try {
-    await fetch(url, {
+    const r = await fetch("/api/discord", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ url, content }),
     });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`);
     $("alertStatus").textContent = `sent ${items.length} alert(s) · ${new Date().toLocaleTimeString()}`;
   } catch (e) {
     $("alertStatus").textContent = `alert send failed: ${e.message}`;
@@ -673,11 +674,12 @@ $("testWebhook").addEventListener("click", async () => {
   const url = $("discordUrl").value.trim();
   if (!url) { $("alertStatus").textContent = "Enter a webhook URL first."; return; }
   try {
-    await fetch(url, {
+    const r = await fetch("/api/discord", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ content: "✅ Breakout Scanner test alert" }),
+      body: JSON.stringify({ url, content: "✅ Breakout Scanner test alert" }),
     });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`);
     $("alertStatus").textContent = `test sent · ${new Date().toLocaleTimeString()}`;
   } catch (e) {
     $("alertStatus").textContent = `test failed: ${e.message}`;

@@ -137,6 +137,7 @@ const BINANCE = "https://api.binance.com";
 const CONCURRENCY = 8;
 const KLINE_LIMIT = 200;
 const TARGET_COUNT = 50;
+const BREAKOUT_MAX_CANDLES = 10; // breakout badge expires this many candles after the 50 EMA cross
 
 // USD stablecoins have no meaningful trend. Any "*USD*" ticker is a USD peg
 // (USDT, USDC, RLUSD, PYUSD, USDS, USD1, … and any future ones); DAI and FRAX
@@ -174,6 +175,17 @@ function emaSeries(values, length) {
   return out;
 }
 
+// Candles since the close most recently crossed the 50 EMA in the `bull`
+// direction (0 on the cross bar). null if the close is not currently beyond
+// the 50 EMA on that side.
+function breakoutAge(closes, e50, last, bull) {
+  const beyond = (i) => e50[i] != null && (bull ? closes[i] > e50[i] : closes[i] < e50[i]);
+  if (!beyond(last)) return null;
+  let start = last;
+  while (start - 1 >= 0 && beyond(start - 1)) start--;
+  return last - start;
+}
+
 // Returns { trend, pnl }. pnl is the price % move since the most recent 5/20
 // EMA cross (current price vs the close at the flip bar): positive = price is
 // up since the flip, negative = down — independent of trend direction.
@@ -184,7 +196,6 @@ function analyzeTrend(closes) {
   const e50 = emaSeries(closes, 50);
   if (last < 0 || e5[last] == null || e20[last] == null) return { trend: "err", pnl: null, flipIdx: null };
   const bull = e5[last] > e20[last];
-  const price = closes[last];
 
   // Walk back to the bar where the EMA relationship last flipped.
   let flipIdx = null;
@@ -197,10 +208,16 @@ function analyzeTrend(closes) {
     pnl = ((closes[last] - closes[flipIdx]) / closes[flipIdx]) * 100;
   }
 
-  // Breakout: trend direction AND the close has cleared the 50 EMA that way.
+  // Breakout: trend direction AND the close crossed the 50 EMA that way within
+  // the last BREAKOUT_MAX_CANDLES candles; afterwards it reverts to plain trend.
   let trend;
-  if (bull) trend = (e50[last] != null && price > e50[last]) ? "bull-breakout" : "bull";
-  else trend = (e50[last] != null && price < e50[last]) ? "bear-breakout" : "bear";
+  if (bull) {
+    const age = breakoutAge(closes, e50, last, true);
+    trend = (age != null && age < BREAKOUT_MAX_CANDLES) ? "bull-breakout" : "bull";
+  } else {
+    const age = breakoutAge(closes, e50, last, false);
+    trend = (age != null && age < BREAKOUT_MAX_CANDLES) ? "bear-breakout" : "bear";
+  }
   return { trend, pnl, flipIdx };
 }
 

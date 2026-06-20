@@ -91,6 +91,8 @@
   .badge.bull { color: var(--bull); background: var(--bull-bg); }
   .badge.bear { color: var(--bear); background: var(--bear-bg); }
   .badge.neutral { color: var(--neutral); background: var(--neutral-bg); }
+  .badge.bull-breakout { color: #06210f; background: var(--bull); }
+  .badge.bear-breakout { color: #2a0508; background: var(--bear); }
   .badge.err  { color: var(--muted); background: var(--panel-alt); }
   td.num { text-align: right; font-variant-numeric: tabular-nums; }
   th.num { text-align: right; }
@@ -114,7 +116,7 @@
 <body>
   <p style="margin:0 0 12px"><a class="chart" href="index.html">← Dashboard Hub</a></p>
   <h1>Crypto Breakout Scanner</h1>
-  <p class="sub">Your watchlist · Trend = 5&nbsp;EMA vs 20&nbsp;EMA (close) on 15m, 1H, 4H &amp; 1D · <span style="color:var(--neutral)">Neutral</span> when price is inside the 20&nbsp;EMA high/low band (no breakout)</p>
+  <p class="sub">Your watchlist · Trend = 5&nbsp;EMA vs 20&nbsp;EMA (close) on 15m, 1H, 4H &amp; 1D · <span style="color:var(--neutral)">Neutral</span> inside the 20&nbsp;EMA high/low band · <b>Breakout</b> when the close clears the 50&nbsp;EMA in the trend direction</p>
 
   <div class="toolbar">
     <input type="text" id="symbolInput" placeholder="Add symbols: BTC, ETH, SOL…">
@@ -232,15 +234,18 @@ function emaSeries(values, length) {
 }
 
 // Returns { trend, pnl, flipIdx }.
-//   trend  : "bull" | "bear" | "neutral" | "err"
+//   trend  : "bull" | "bear" | "neutral" | "bull-breakout" | "bear-breakout" | "err"
 //   neutral: current close sits inside the band between the 20 EMA of highs
 //            and the 20 EMA of lows (price has not broken out either way).
 //   bull/bear (outside the band): 5 EMA vs 20 EMA of close.
+//   *-breakout: trend is bull/bear AND the close is beyond the 50 EMA in that
+//               direction (above for bull, below for bear).
 //   pnl    : price % move since the most recent 5/20 EMA cross.
 function analyzeTrend(closes, highs, lows) {
   const last = closes.length - 1;
   const e5 = emaSeries(closes, 5);
   const e20 = emaSeries(closes, 20);
+  const e50 = emaSeries(closes, 50);
   const e20hi = emaSeries(highs, 20);
   const e20lo = emaSeries(lows, 20);
   if (last < 0 || e5[last] == null || e20[last] == null) return { trend: "err", pnl: null, flipIdx: null };
@@ -260,7 +265,15 @@ function analyzeTrend(closes, highs, lows) {
   if (flipIdx != null && closes[flipIdx]) {
     pnl = ((closes[last] - closes[flipIdx]) / closes[flipIdx]) * 100;
   }
-  const trend = inBand ? "neutral" : (bull ? "bull" : "bear");
+
+  let trend;
+  if (inBand) {
+    trend = "neutral";
+  } else if (bull) {
+    trend = (e50[last] != null && price > e50[last]) ? "bull-breakout" : "bull";
+  } else {
+    trend = (e50[last] != null && price < e50[last]) ? "bear-breakout" : "bear";
+  }
   return { trend, pnl, flipIdx };
 }
 
@@ -308,6 +321,8 @@ async function getTicker(pair) {
 
 // ---- Render -------------------------------------------------------------
 function badge(state) {
+  if (state === "bull-breakout") return '<span class="badge bull-breakout">BREAKOUT ▲</span>';
+  if (state === "bear-breakout") return '<span class="badge bear-breakout">BREAKOUT ▼</span>';
   if (state === "bull") return '<span class="badge bull">BULLISH</span>';
   if (state === "bear") return '<span class="badge bear">BEARISH</span>';
   if (state === "neutral") return '<span class="badge neutral">NEUTRAL</span>';
@@ -338,8 +353,8 @@ function renderSummary() {
   const tally = (key) => {
     let bull = 0, bear = 0, neutral = 0;
     for (const a of assets) {
-      if (a[key] === "bull") bull++;
-      else if (a[key] === "bear") bear++;
+      if (a[key] === "bull" || a[key] === "bull-breakout") bull++;
+      else if (a[key] === "bear" || a[key] === "bear-breakout") bear++;
       else if (a[key] === "neutral") neutral++;
     }
     return { bull, bear, neutral, total: bull + bear + neutral };

@@ -70,6 +70,8 @@
   }
   .badge.bull { color: var(--bull); background: var(--bull-bg); }
   .badge.bear { color: var(--bear); background: var(--bear-bg); }
+  .badge.bull-breakout { color: #06210f; background: var(--bull); }
+  .badge.bear-breakout { color: #2a0508; background: var(--bear); }
   .badge.err  { color: var(--muted); background: var(--panel-alt); }
   td.num { text-align: right; font-variant-numeric: tabular-nums; }
   th.num { text-align: right; }
@@ -179,8 +181,10 @@ function analyzeTrend(closes) {
   const last = closes.length - 1;
   const e5 = emaSeries(closes, 5);
   const e20 = emaSeries(closes, 20);
+  const e50 = emaSeries(closes, 50);
   if (last < 0 || e5[last] == null || e20[last] == null) return { trend: "err", pnl: null, flipIdx: null };
   const bull = e5[last] > e20[last];
+  const price = closes[last];
 
   // Walk back to the bar where the EMA relationship last flipped.
   let flipIdx = null;
@@ -192,7 +196,12 @@ function analyzeTrend(closes) {
   if (flipIdx != null && closes[flipIdx]) {
     pnl = ((closes[last] - closes[flipIdx]) / closes[flipIdx]) * 100;
   }
-  return { trend: bull ? "bull" : "bear", pnl, flipIdx };
+
+  // Breakout: trend direction AND the close has cleared the 50 EMA that way.
+  let trend;
+  if (bull) trend = (e50[last] != null && price > e50[last]) ? "bull-breakout" : "bull";
+  else trend = (e50[last] != null && price < e50[last]) ? "bear-breakout" : "bear";
+  return { trend, pnl, flipIdx };
 }
 
 // ---- Throttled map ------------------------------------------------------
@@ -239,6 +248,8 @@ async function getKlines(pair, interval) {
 
 // ---- Render -------------------------------------------------------------
 function badge(state) {
+  if (state === "bull-breakout") return '<span class="badge bull-breakout">BREAKOUT ▲</span>';
+  if (state === "bear-breakout") return '<span class="badge bear-breakout">BREAKOUT ▼</span>';
   if (state === "bull") return '<span class="badge bull">BULLISH</span>';
   if (state === "bear") return '<span class="badge bear">BEARISH</span>';
   return '<span class="badge err">—</span>';
@@ -273,8 +284,8 @@ function renderSummary() {
   const tally = (key) => {
     let bull = 0, bear = 0;
     for (const a of assets) {
-      if (a[key] === "bull") bull++;
-      else if (a[key] === "bear") bear++;
+      if (a[key] === "bull" || a[key] === "bull-breakout") bull++;
+      else if (a[key] === "bear" || a[key] === "bear-breakout") bear++;
     }
     return { bull, bear, total: bull + bear };
   };

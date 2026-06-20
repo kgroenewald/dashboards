@@ -43,6 +43,12 @@
     border-radius: 6px; padding: 9px 12px; font-size: 14px; min-width: 240px;
   }
   input[type="text"]::placeholder { color: var(--muted); }
+  input[type="number"] {
+    background: var(--panel); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 8px; font-size: 14px; width: 58px;
+  }
+  .auto { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); cursor: pointer; }
+  #nextRefresh { color: var(--muted); font-size: 13px; }
   #status { color: var(--muted); font-size: 13px; }
   #progress { color: var(--muted); font-size: 13px; }
 
@@ -122,6 +128,9 @@
     <input type="text" id="symbolInput" placeholder="Add symbols: BTC, ETH, SOL…">
     <button id="addBtn">Add</button>
     <button id="refresh">Refresh</button>
+    <label class="auto"><input type="checkbox" id="autoRefresh"> Auto-refresh every
+      <input type="number" id="intervalMin" min="1" step="1" value="5"> min</label>
+    <span id="nextRefresh"></span>
     <span class="toggles">
       <label><input type="checkbox" id="toggle15m" checked> 15m columns</label>
       <label><input type="checkbox" id="toggle1h" checked> 1H columns</label>
@@ -530,7 +539,39 @@ async function refresh() {
     $("status").textContent = "Error.";
   } finally {
     btn.disabled = false;
+    if (autoTimer) nextRefreshAt = Date.now() + intervalMs();
   }
+}
+
+// ---- Auto-refresh -------------------------------------------------------
+let autoTimer = null;
+let nextRefreshAt = null;
+
+function intervalMs() {
+  const m = parseFloat($("intervalMin").value);
+  return (isFinite(m) && m > 0 ? m : 5) * 60000;
+}
+function stopAuto() {
+  if (autoTimer) { clearInterval(autoTimer); autoTimer = null; }
+  nextRefreshAt = null;
+  $("nextRefresh").textContent = "";
+}
+function startAuto() {
+  if (autoTimer) clearInterval(autoTimer);
+  nextRefreshAt = Date.now() + intervalMs();
+  autoTimer = setInterval(tickAuto, 1000);
+  tickAuto();
+}
+function tickAuto() {
+  if (nextRefreshAt == null) return;
+  const remaining = nextRefreshAt - Date.now();
+  if (remaining <= 0) {
+    nextRefreshAt = Date.now() + intervalMs();
+    refresh();
+    return;
+  }
+  const s = Math.ceil(remaining / 1000);
+  $("nextRefresh").textContent = `next in ${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
 // ---- Events -------------------------------------------------------------
@@ -547,6 +588,8 @@ $("addBtn").addEventListener("click", () => { addSymbols($("symbolInput").value)
 $("symbolInput").addEventListener("keydown", (e) => {
   if (e.key === "Enter") { addSymbols($("symbolInput").value); $("symbolInput").value = ""; }
 });
+$("autoRefresh").addEventListener("change", (e) => e.target.checked ? startAuto() : stopAuto());
+$("intervalMin").addEventListener("change", () => { if ($("autoRefresh").checked) startAuto(); });
 $("toggle15m").addEventListener("change", (e) => document.body.classList.toggle("hide-15m", !e.target.checked));
 $("toggle1h").addEventListener("change", (e) => document.body.classList.toggle("hide-1h", !e.target.checked));
 $("toggle4h").addEventListener("change", (e) => document.body.classList.toggle("hide-4h", !e.target.checked));
